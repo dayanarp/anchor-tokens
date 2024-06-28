@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::*;
+use anchor_spl::associated_token::*;
 
 declare_id!("88BwGU74Yno9PQQVPZUQ3S93U6fGGjFKnpLfUxKDxKJf");
 
@@ -21,7 +22,7 @@ pub mod tokens {
                 ctx.accounts.token_program.to_account_info(), // token program
                 MintTo {
                     mint: ctx.accounts.mint_account.to_account_info(), // mint
-                    to: ctx.accounts.token_account.to_account_info(), // token account
+                    to: ctx.accounts.associated_token_account.to_account_info(), // associated token account
                     authority: ctx.accounts.mint_authority.to_account_info(), // mint authority
                 },
             ),
@@ -40,8 +41,8 @@ pub mod tokens {
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(), // token program
                 Transfer {
-                    from: ctx.accounts.sender_token_account.to_account_info(), // token account que envía
-                    to: ctx.accounts.recipient_token_account.to_account_info(), // token account que recibe
+                    from: ctx.accounts.sender_ata.to_account_info(), // associated token account que envía
+                    to: ctx.accounts.recipient_ata.to_account_info(), // associated token account que recibe
                     authority: ctx.accounts.sender.to_account_info(), // wallet de quien envía
                 },
             ),
@@ -92,12 +93,13 @@ pub struct MintToken<'info> {
     #[account(
         init_if_needed, // crea la cuenta si aún no existe
         payer = mint_authority, 
-        token::mint = mint_account, // token que se recibe la cuenta
-        token::authority = recipient, // wallet del recipiente será autoridad del token account
+        associated_token::mint = mint_account, // token que se recibe la cuenta
+        associated_token::authority = recipient, // wallet del recipiente será autoridad del token account
     )]
-    pub token_account: Account<'info, TokenAccount>, // Token Account del recipiente
+    pub associated_token_account: Account<'info, TokenAccount>, // Token Account del recipiente
 
     pub token_program: Program<'info, Token>, // Token Program
+    pub associated_token_program: Program<'info, AssociatedToken>, // Token Program
     pub system_program: Program<'info, System>, // System Program
 }
 
@@ -113,16 +115,17 @@ pub struct TransferTokens<'info> {
     #[account(mut)]
     pub mint_account: Account<'info, Mint>, // Mint Account
     #[account(mut)]
-    pub sender_token_account: Account<'info, TokenAccount>, // Token Account de quien envía
+    pub sender_ata: Account<'info, TokenAccount>, // Token Account de quien envía
 
     #[account(
         init_if_needed, // crea la cienta si aún no existe
         payer = sender, // quien envía corre con los gastos de ser necesario
-        token::mint = mint_account, // token que recibe la cuenta
-        token::authority = recipient, // la autoridad del token account sera la wallet del recipiente
+        associated_token::mint = mint_account, // token que recibe la cuenta
+        associated_token::authority = recipient, // la autoridad del token account sera la wallet del recipiente
     )]
-    pub recipient_token_account: Account<'info, TokenAccount>, // Token Account del recipiente
+    pub recipient_ata: Account<'info, TokenAccount>, // Token Account del recipiente
 
     pub token_program: Program<'info, Token>, // Token Program
+    pub associated_token_program: Program<'info, AssociatedToken>, // Token Program
     pub system_program: Program<'info, System>, // System Program
 }

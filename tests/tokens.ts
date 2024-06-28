@@ -2,77 +2,84 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Tokens } from "../target/types/tokens";
 import { Keypair, PublicKey } from '@solana/web3.js';
+import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 
 describe("Token Test", () => {
-  // Configure the client to use the local cluster.
+  // Configura el Cliente al cluster local.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
+  // programa
   const program = anchor.workspace.Tokens as Program<Tokens>;
 
-   // Generate new keypair to use as address for mint account.
-   const mintKp = new Keypair();
-
-   // Generate new keypair to use as address for recipient wallet.
-   const tokenAccountKp = new Keypair();
-
-   const alice = new PublicKey(
+  // Generamos una keypair nueva para usar como address del nuevo Token.
+  const mintKp = new Keypair();
+  // Definimos una public key de una wallet existente.
+  const recipient = new PublicKey(
     "AivDNg7fdxHzotN8sMMXMVULTdfuYhfq5PKCoVWCx3Tg"
   );
-   // Generate new keypair to use as address for recipient wallet.
-   const recipientTokenAccountKp = new Keypair();
 
+  // Generamos una keypair nueva para usar como address de la
+  // wallet del recipiente.
+  //const recipient = new Keypair();
+
+  let senderATA: PublicKey;
+  let recipientATA: PublicKey;
+
+  before(async () => {
+    // Derivamos la dirección del associated token account de nuestra wallet y el nuevo Token.
+    senderATA = getAssociatedTokenAddressSync(mintKp.publicKey, provider.wallet.publicKey);
+
+    // Derivamos la dirección del associated token account del recipiente y el nuevo Token.
+    recipientATA = getAssociatedTokenAddressSync(mintKp.publicKey, recipient);
+  });
+
+  // TEST
+  // ----------------------- Create New Token -------------------------//
   it("Creates a new Token", async () => {
-    // Add your test here.
     const tx = await program.methods.createToken().accounts({
-        payer: provider.wallet.publicKey,
-        mintAccount: mintKp.publicKey,
+        payer: provider.wallet.publicKey, // nuestra wallet
+        mintAccount: mintKp.publicKey, // dirección del nuevo Token
     })
     .signers([mintKp])
     .rpc();
     console.log('Success!');
-    console.log(`   Mint Address: ${mintKp.publicKey}`);
+    console.log(`Mint Address: ${mintKp.publicKey}`);
+    console.log(`Transaction Signature: ${tx}`);
   });
 
-  it('Mint tokens!', async () => {
-    // Amount of tokens to mint.
-    const amount = new anchor.BN(100);
-
-    // Mint the tokens to the associated token account.
-    const transactionSignature = await program.methods
+  // ----------------------- Mint 10 Tokens -------------------------//
+  it('Mint 10 Tokens', async () => {
+    const amount = new anchor.BN(10); // Numero de tokens a mintear
+    const tx = await program.methods
       .mintToken(amount)
       .accounts({
-        mintAuthority: provider.wallet.publicKey,
-        recipient: provider.wallet.publicKey,
-        mintAccount: mintKp.publicKey,
-        tokenAccount: tokenAccountKp.publicKey,
+        mintAuthority: provider.wallet.publicKey, // autoridad del Token
+        recipient: provider.wallet.publicKey, // wallet de quien recibe el mint
+        mintAccount: mintKp.publicKey, // dirección del Token
+        associatedTokenAccount: senderATA, // Token Account donde se recibirán los tokens
       })
-      .signers([tokenAccountKp])
       .rpc();
-
     console.log('Success!');
-    console.log(`   Token Account Address: ${tokenAccountKp.publicKey}`);
-    console.log(`   Transaction Signature: ${transactionSignature}`);
+    console.log(`Token Account Address: ${senderATA}`);
+    console.log(`Transaction Signature: ${tx}`);
   });
 
+  // ----------------------- Transferir 4 Tokens -------------------------//
   it('Transfer tokens!', async () => {
-    // Amount of tokens to transfer.
-    const amount = new anchor.BN(50);
-
-    const transactionSignature = await program.methods
+    const amount = new anchor.BN(4); // Numero de tokens a transferir
+    const tx = await program.methods
       .transferTokens(amount)
       .accounts({
-        sender: provider.wallet.publicKey,
-        recipient: alice,
-        mintAccount: mintKp.publicKey,
-        senderTokenAccount: tokenAccountKp.publicKey,
-        recipientTokenAccount: recipientTokenAccountKp.publicKey,
+        sender: provider.wallet.publicKey, // wallet de quien envía
+        recipient: recipient, // wallet del recipiente
+        mintAccount: mintKp.publicKey, // dirección del token
+        senderAta: senderATA, // Token Account de quien envía
+        recipientAta: recipientATA, // Token Account de quien recibe
       })
-      .signers([recipientTokenAccountKp])
       .rpc();
-
     console.log('Success!');
-    console.log(`   Transaction Signature: ${transactionSignature}`);
+    console.log(`Transaction Signature: ${tx}`);
   });
 
 });
